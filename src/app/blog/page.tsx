@@ -200,7 +200,7 @@ export default function BlogPage() {
 
       <footer className="py-4 border-t">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} MD Jahid Uddin Sami. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} MD Rakibul Hasan. All rights reserved.</p>
         </div>
       </footer>
     </div>

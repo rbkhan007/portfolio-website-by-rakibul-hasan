@@ -3,261 +3,634 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from './theme-provider'
 
-// Particle class with home position memory and mouse interaction
-class Particle {
+// Glowing particle configuration
+interface GlowingParticle {
   x: number
   y: number
-  baseX: number
-  baseY: number
+  vx: number
+  vy: number
   size: number
   color: string
-  density: number
-  vx: number = 0
-  vy: number = 0
-  trail: Array<{ x: number; y: number; alpha: number }> = []
-  maxTrailLength: number
-  isDarkMode: boolean
-  angle: number
-  speed: number
-  opacity: number
-  twinkle: number
-
-  constructor(x: number, y: number, size: number, color: string, isDarkMode: boolean) {
-    this.x = x
-    this.y = y
-    this.baseX = x
-    this.baseY = y
-    this.size = size
-    this.color = color
-    this.density = Math.random() * 30 + 1
-    this.isDarkMode = isDarkMode
-    this.maxTrailLength = isDarkMode ? 15 : 0
-    this.angle = Math.random() * Math.PI * 2
-    this.speed = Math.random() * 0.5 + 0.2
-    this.opacity = Math.random() * 0.5 + 0.5
-    this.twinkle = Math.random() * Math.PI * 2
-  }
-
-  draw(ctx: CanvasRenderingContext2D, isDark: boolean) {
-    // Draw trail for shooting star effect in dark mode
-    if (isDark && this.trail.length > 1) {
-      for (let i = 0; i < this.trail.length; i++) {
-        const point = this.trail[i]
-        const trailAlpha = (i / this.trail.length) * 0.5 * this.opacity
-        const trailSize = (i / this.trail.length) * this.size
-        
-        ctx.beginPath()
-        ctx.arc(point.x, point.y, Math.max(0.5, trailSize), 0, Math.PI * 2)
-        ctx.fillStyle = this.color.replace('1)', `${trailAlpha})`)
-        ctx.fill()
-      }
-    }
-
-    // Main particle
-    ctx.beginPath()
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-    ctx.closePath()
-
-    if (isDark) {
-      // Shooting star glow effect
-      const glowSize = this.size * 3
-      const gradient = ctx.createRadialGradient(
-        this.x, this.y, 0,
-        this.x, this.y, glowSize
-      )
-      
-      // Twinkle effect
-      this.twinkle += 0.05
-      const twinkleOpacity = 0.5 + Math.sin(this.twinkle) * 0.3
-      
-      gradient.addColorStop(0, this.color.replace('1)', `${this.opacity})`))
-      gradient.addColorStop(0.3, this.color.replace('1)', `${this.opacity * 0.6 * twinkleOpacity})`))
-      gradient.addColorStop(1, this.color.replace('1)', '0)'))
-      
-      ctx.fillStyle = gradient
-      ctx.fill()
-      
-      // Bright core
-      ctx.beginPath()
-      ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity * twinkleOpacity})`
-      ctx.fill()
-    } else {
-      // Simple 3D sphere effect for light mode
-      const gradient = ctx.createRadialGradient(
-        this.x - this.size * 0.3,
-        this.y - this.size * 0.3,
-        0,
-        this.x,
-        this.y,
-        this.size
-      )
-      
-      gradient.addColorStop(0, this.color)
-      gradient.addColorStop(0.5, this.color.replace('1)', '0.8)'))
-      gradient.addColorStop(1, this.color.replace('1)', '0.3)'))
-      
-      ctx.fillStyle = gradient
-      ctx.fill()
-    }
-  }
-
-  update(
-    mouseX: number, 
-    mouseY: number, 
-    mouseRadius: number, 
-    friction: number, 
-    returnSpeed: number,
-    isDark: boolean,
-    width: number,
-    height: number
-  ) {
-    // Add current position to trail for shooting star effect
-    if (isDark && this.maxTrailLength > 0) {
-      this.trail.push({ x: this.x, y: this.y, alpha: 1 })
-      if (this.trail.length > this.maxTrailLength) {
-        this.trail.shift()
-      }
-    } else {
-      this.trail = []
-    }
-
-    if (isDark) {
-      // Shooting star behavior in dark mode
-      this.angle += this.speed * 0.02
-      
-      // Move in a flowing pattern
-      const flowSpeed = 0.3
-      this.vx += Math.cos(this.angle) * flowSpeed
-      this.vy += Math.sin(this.angle) * flowSpeed + 0.1 // Slight downward drift
-      
-      // Mouse repulsion (stronger in dark mode)
-      const dx = mouseX - this.x
-      const dy = mouseY - this.y
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      
-      if (distance < mouseRadius && distance > 0) {
-        const force = (mouseRadius - distance) / mouseRadius * 2
-        this.vx -= (dx / distance) * force * this.density * 0.3
-        this.vy -= (dy / distance) * force * this.density * 0.3
-      }
-
-      // Apply friction
-      this.vx *= 0.98
-      this.vy *= 0.98
-
-      // Boundary wrapping for shooting stars
-      if (this.x < -50) this.x = width + 50
-      if (this.x > width + 50) this.x = -50
-      if (this.y < -50) this.y = height + 50
-      if (this.y > height + 50) this.y = -50
-
-    } else {
-      // Simple floating behavior in light mode
-      const dx = mouseX - this.x
-      const dy = mouseY - this.y
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      
-      // Mouse repulsion
-      if (distance < mouseRadius && distance > 0) {
-        const force = (mouseRadius - distance) / mouseRadius
-        const forceDirectionX = dx / distance
-        const forceDirectionY = dy / distance
-        const maxForce = force * this.density * 0.5
-        this.vx -= forceDirectionX * maxForce
-        this.vy -= forceDirectionY * maxForce
-      }
-      
-      // Return to home position
-      const homeX = this.baseX - this.x
-      const homeY = this.baseY - this.y
-      this.vx += homeX * returnSpeed
-      this.vy += homeY * returnSpeed
-      
-      // Apply friction
-      this.vx *= friction
-      this.vy *= friction
-    }
-
-    // Update position
-    this.x += this.vx
-    this.y += this.vy
-  }
+  alpha: number
+  baseAlpha: number
+  pulsePhase: number
+  pulseSpeed: number
+  driftPhaseX: number
+  driftPhaseY: number
+  driftSpeedX: number
+  driftSpeedY: number
 }
 
-// Color palette (Google-inspired)
-const COLORS_LIGHT = [
-  'rgba(234, 67, 53, 1)',   // Google Red
-  'rgba(66, 133, 244, 1)',  // Google Blue
-  'rgba(52, 168, 83, 1)',   // Google Green
-  'rgba(251, 188, 5, 1)',   // Google Yellow
-  'rgba(155, 89, 182, 1)',  // Purple
-  'rgba(77, 195, 255, 1)',  // Cyan
+// Tiny dot configuration
+interface TinyDot {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  size: number
+  alpha: number
+  driftPhaseX: number
+  driftPhaseY: number
+}
+
+// Color palettes
+const LIGHT_GLOW_COLORS = [
+  'rgba(107, 140, 255, 1)',
+  'rgba(168, 192, 255, 1)',
+  'rgba(139, 92, 246, 1)',
+  'rgba(167, 139, 250, 1)',
+  'rgba(236, 72, 153, 1)',
+  'rgba(244, 114, 182, 1)',
+  'rgba(99, 102, 241, 1)',
+  'rgba(59, 130, 246, 1)',
 ]
 
-const COLORS_DARK = [
-  'rgba(255, 255, 255, 1)',      // White
-  'rgba(200, 220, 255, 1)',      // Light Blue
-  'rgba(255, 200, 200, 1)',      // Light Red
-  'rgba(200, 255, 200, 1)',      // Light Green
-  'rgba(255, 255, 200, 1)',      // Light Yellow
-  'rgba(220, 200, 255, 1)',      // Light Purple
+const DARK_GLOW_COLORS = [
+  'rgba(0, 229, 255, 1)',
+  'rgba(255, 64, 129, 1)',
+  'rgba(124, 77, 255, 1)',
+  'rgba(105, 240, 174, 1)',
+  'rgba(255, 215, 64, 1)',
+  'rgba(64, 196, 255, 1)',
 ]
 
-// Draw decorative gradient orbs
-function drawGradientOrbs(ctx: CanvasRenderingContext2D, width: number, height: number, isDark: boolean) {
-  if (isDark) {
-    // Dark mode - subtle colored nebula effects
-    const nebula1 = ctx.createRadialGradient(
-      width * 0.2, height * 0.3, 0,
-      width * 0.2, height * 0.3, width * 0.4
-    )
-    nebula1.addColorStop(0, 'rgba(100, 100, 255, 0.08)')
-    nebula1.addColorStop(0.5, 'rgba(100, 100, 255, 0.03)')
-    nebula1.addColorStop(1, 'rgba(100, 100, 255, 0)')
-    ctx.fillStyle = nebula1
-    ctx.fillRect(0, 0, width, height)
+class CombinedParticleSystem {
+  private canvas: HTMLCanvasElement
+  private ctx: CanvasRenderingContext2D
+  private glowingParticles: GlowingParticle[] = []
+  private tinyDots: TinyDot[] = []
+  private width: number = 0
+  private height: number = 0
+  private mouseX: number = -1000
+  private mouseY: number = -1000
+  private prevMouseX: number = -1000
+  private prevMouseY: number = -1000
+  private mouseStationaryTime: number = 0
+  private isMouseDown: boolean = false
+  private animationId: number | null = null
+  private isDark: boolean = false
+  private dpr: number = 1
+  private time: number = 0
+  private glowingParticleCount: number = 60
+  private tinyDotCount: number = 200
+  private readonly STATIONARY_THRESHOLD: number = 0.3 // seconds before attraction starts
 
-    const nebula2 = ctx.createRadialGradient(
-      width * 0.8, height * 0.7, 0,
-      width * 0.8, height * 0.7, width * 0.35
-    )
-    nebula2.addColorStop(0, 'rgba(255, 100, 150, 0.06)')
-    nebula2.addColorStop(0.5, 'rgba(255, 100, 150, 0.02)')
-    nebula2.addColorStop(1, 'rgba(255, 100, 150, 0)')
-    ctx.fillStyle = nebula2
-    ctx.fillRect(0, 0, width, height)
-  } else {
-    // Light mode - original gradient orbs
-    const orb1 = ctx.createRadialGradient(
-      width * 0.85, height * 0.15, 0,
-      width * 0.85, height * 0.15, width * 0.3
-    )
-    orb1.addColorStop(0, 'rgba(66, 133, 244, 0.1)')
-    orb1.addColorStop(0.5, 'rgba(66, 133, 244, 0.05)')
-    orb1.addColorStop(1, 'rgba(66, 133, 244, 0)')
-    ctx.fillStyle = orb1
-    ctx.fillRect(0, 0, width, height)
+  constructor(canvas: HTMLCanvasElement, isDark: boolean) {
+    this.canvas = canvas
+    this.ctx = canvas.getContext('2d', { alpha: true })!
+    this.isDark = isDark
+    this.dpr = Math.min(window.devicePixelRatio, 2)
+    this.resize()
+    this.init()
+  }
 
-    const orb2 = ctx.createRadialGradient(
-      width * 0.1, height * 0.85, 0,
-      width * 0.1, height * 0.85, width * 0.25
-    )
-    orb2.addColorStop(0, 'rgba(234, 67, 53, 0.08)')
-    orb2.addColorStop(0.5, 'rgba(234, 67, 53, 0.04)')
-    orb2.addColorStop(1, 'rgba(234, 67, 53, 0)')
-    ctx.fillStyle = orb2
-    ctx.fillRect(0, 0, width, height)
+  private resize() {
+    this.width = window.innerWidth
+    this.height = window.innerHeight
+    this.canvas.width = this.width * this.dpr
+    this.canvas.height = this.height * this.dpr
+    this.canvas.style.width = `${this.width}px`
+    this.canvas.style.height = `${this.height}px`
+    this.ctx.scale(this.dpr, this.dpr)
+    
+    const area = this.width * this.height
+    this.glowingParticleCount = Math.floor(area / 25000)
+    this.glowingParticleCount = Math.max(30, Math.min(100, this.glowingParticleCount))
+    
+    this.tinyDotCount = Math.floor(area / 8000)
+    this.tinyDotCount = Math.max(100, Math.min(400, this.tinyDotCount))
+  }
 
-    const orb3 = ctx.createRadialGradient(
-      width * 0.4, height * 0.5, 0,
-      width * 0.4, height * 0.5, width * 0.2
+  private init() {
+    this.glowingParticles = []
+    this.tinyDots = []
+    
+    const colors = this.isDark ? DARK_GLOW_COLORS : LIGHT_GLOW_COLORS
+
+    for (let i = 0; i < this.glowingParticleCount; i++) {
+      this.glowingParticles.push({
+        x: Math.random() * this.width,
+        y: Math.random() * this.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 3 + 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: Math.random() * 0.4 + 0.3,
+        baseAlpha: Math.random() * 0.4 + 0.3,
+        pulsePhase: Math.random() * Math.PI * 2,
+        pulseSpeed: Math.random() * 0.02 + 0.01,
+        driftPhaseX: Math.random() * Math.PI * 2,
+        driftPhaseY: Math.random() * Math.PI * 2,
+        driftSpeedX: Math.random() * 0.003 + 0.001,
+        driftSpeedY: Math.random() * 0.003 + 0.001,
+      })
+    }
+
+    const cols = Math.ceil(Math.sqrt(this.tinyDotCount * (this.width / this.height)))
+    const rows = Math.ceil(this.tinyDotCount / cols)
+    const cellWidth = this.width / cols
+    const cellHeight = this.height / rows
+    
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        if (this.tinyDots.length >= this.tinyDotCount) break
+        
+        this.tinyDots.push({
+          x: cellWidth * (i + 0.5) + (Math.random() - 0.5) * cellWidth * 0.8,
+          y: cellHeight * (j + 0.5) + (Math.random() - 0.5) * cellHeight * 0.8,
+          vx: 0,
+          vy: 0,
+          size: Math.random() * 1 + 0.5,
+          alpha: Math.random() * 0.3 + 0.1,
+          driftPhaseX: Math.random() * Math.PI * 2,
+          driftPhaseY: Math.random() * Math.PI * 2,
+        })
+      }
+    }
+  }
+
+  setTheme(isDark: boolean) {
+    this.isDark = isDark
+    const colors = isDark ? DARK_GLOW_COLORS : LIGHT_GLOW_COLORS
+    this.glowingParticles.forEach(p => {
+      p.color = colors[Math.floor(Math.random() * colors.length)]
+    })
+  }
+
+  setMouse(x: number, y: number) {
+    // Check if mouse moved
+    const dx = x - this.prevMouseX
+    const dy = y - this.prevMouseY
+    const moved = Math.sqrt(dx * dx + dy * dy) > 2
+    
+    if (moved) {
+      this.mouseStationaryTime = 0
+    }
+    
+    this.prevMouseX = this.mouseX
+    this.prevMouseY = this.mouseY
+    this.mouseX = x
+    this.mouseY = y
+  }
+
+  setMouseDown(isDown: boolean) {
+    this.isMouseDown = isDown
+  }
+
+  private drawBackground() {
+    if (this.isDark) {
+      // Deep space dark mode background with rich gradients
+      const bgGradient = this.ctx.createRadialGradient(
+        this.width * 0.5, this.height * 0.5, 0,
+        this.width * 0.5, this.height * 0.5, Math.max(this.width, this.height)
+      )
+      bgGradient.addColorStop(0, '#0f0f1a')
+      bgGradient.addColorStop(0.3, '#0a0a12')
+      bgGradient.addColorStop(0.7, '#050508')
+      bgGradient.addColorStop(1, '#020204')
+      this.ctx.fillStyle = bgGradient
+      this.ctx.fillRect(0, 0, this.width, this.height)
+
+      // Animated nebula effects with subtle movement
+      const timeOffset = this.time * 0.1
+      
+      // Cyan nebula - top left
+      this.drawNebulaGlow(
+        this.width * 0.2 + Math.sin(timeOffset) * 20,
+        this.height * 0.25 + Math.cos(timeOffset * 0.7) * 15,
+        this.width * 0.45,
+        'rgba(0, 229, 255, 0.04)',
+        'rgba(0, 229, 255, 0.02)'
+      )
+      
+      // Magenta nebula - bottom right
+      this.drawNebulaGlow(
+        this.width * 0.8 + Math.cos(timeOffset * 0.8) * 25,
+        this.height * 0.75 + Math.sin(timeOffset * 0.6) * 20,
+        this.width * 0.4,
+        'rgba(255, 64, 129, 0.035)',
+        'rgba(255, 64, 129, 0.015)'
+      )
+      
+      // Purple nebula - center
+      this.drawNebulaGlow(
+        this.width * 0.5 + Math.sin(timeOffset * 0.5) * 30,
+        this.height * 0.5 + Math.cos(timeOffset * 0.4) * 25,
+        this.width * 0.35,
+        'rgba(124, 77, 255, 0.03)',
+        'rgba(124, 77, 255, 0.01)'
+      )
+      
+      // Green accent - subtle
+      this.drawNebulaGlow(
+        this.width * 0.15 + Math.cos(timeOffset * 0.3) * 15,
+        this.height * 0.8 + Math.sin(timeOffset * 0.5) * 10,
+        this.width * 0.25,
+        'rgba(105, 240, 174, 0.025)',
+        'rgba(105, 240, 174, 0.008)'
+      )
+
+      // Subtle star field
+      this.drawStarField()
+      
+    } else {
+      // Clean professional light mode background
+      const bgGradient = this.ctx.createRadialGradient(
+        this.width * 0.5, this.height * 0.3, 0,
+        this.width * 0.5, this.height * 0.5, Math.max(this.width, this.height)
+      )
+      bgGradient.addColorStop(0, '#ffffff')
+      bgGradient.addColorStop(0.4, '#fafbff')
+      bgGradient.addColorStop(0.7, '#f5f7ff')
+      bgGradient.addColorStop(1, '#f0f4ff')
+      this.ctx.fillStyle = bgGradient
+      this.ctx.fillRect(0, 0, this.width, this.height)
+
+      // Subtle mesh gradient orbs
+      const timeOffset = this.time * 0.08
+      
+      // Blue orb - top right
+      this.drawMeshOrb(
+        this.width * 0.85 + Math.sin(timeOffset) * 10,
+        this.height * 0.15 + Math.cos(timeOffset * 0.7) * 8,
+        this.width * 0.25,
+        'rgba(99, 102, 241, 0.06)',
+        'rgba(99, 102, 241, 0.02)'
+      )
+      
+      // Purple orb - bottom left
+      this.drawMeshOrb(
+        this.width * 0.1 + Math.cos(timeOffset * 0.6) * 12,
+        this.height * 0.85 + Math.sin(timeOffset * 0.5) * 10,
+        this.width * 0.2,
+        'rgba(139, 92, 246, 0.05)',
+        'rgba(139, 92, 246, 0.015)'
+      )
+      
+      // Pink accent - center right
+      this.drawMeshOrb(
+        this.width * 0.75 + Math.sin(timeOffset * 0.4) * 8,
+        this.height * 0.6 + Math.cos(timeOffset * 0.3) * 6,
+        this.width * 0.15,
+        'rgba(236, 72, 153, 0.04)',
+        'rgba(236, 72, 153, 0.01)'
+      )
+
+      // Subtle grid pattern overlay
+      this.drawSubtleGrid()
+    }
+  }
+
+  private drawNebulaGlow(x: number, y: number, radius: number, innerColor: string, outerColor: string) {
+    const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius)
+    gradient.addColorStop(0, innerColor)
+    gradient.addColorStop(0.4, outerColor)
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    this.ctx.fillStyle = gradient
+    this.ctx.fillRect(0, 0, this.width, this.height)
+  }
+
+  private drawMeshOrb(x: number, y: number, radius: number, innerColor: string, outerColor: string) {
+    const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius)
+    gradient.addColorStop(0, innerColor)
+    gradient.addColorStop(0.5, outerColor)
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    this.ctx.fillStyle = gradient
+    this.ctx.fillRect(0, 0, this.width, this.height)
+  }
+
+  private drawStarField() {
+    // Draw subtle background stars (static positions based on time seed)
+    const starCount = 50
+    for (let i = 0; i < starCount; i++) {
+      const seed = i * 12345.6789
+      const x = (Math.sin(seed) * 0.5 + 0.5) * this.width
+      const y = (Math.cos(seed * 1.1) * 0.5 + 0.5) * this.height
+      const size = (Math.sin(seed * 2.2) * 0.5 + 0.5) * 1.2 + 0.3
+      const twinkle = Math.sin(this.time * 2 + seed) * 0.3 + 0.5
+      const alpha = (Math.sin(seed * 3.3) * 0.5 + 0.5) * 0.15 * twinkle
+      
+      this.ctx.beginPath()
+      this.ctx.arc(x, y, size, 0, Math.PI * 2)
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`
+      this.ctx.fill()
+    }
+  }
+
+  private drawSubtleGrid() {
+    // Very subtle dot grid pattern for light mode
+    const gridSize = 60
+    const dotAlpha = 0.015
+    
+    this.ctx.fillStyle = `rgba(99, 102, 241, ${dotAlpha})`
+    
+    for (let x = gridSize; x < this.width; x += gridSize) {
+      for (let y = gridSize; y < this.height; y += gridSize) {
+        this.ctx.beginPath()
+        this.ctx.arc(x, y, 0.8, 0, Math.PI * 2)
+        this.ctx.fill()
+      }
+    }
+  }
+
+  private drawAmbientGlow(x: number, y: number, radius: number, color: string) {
+    const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius)
+    gradient.addColorStop(0, color)
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    this.ctx.fillStyle = gradient
+    this.ctx.fillRect(0, 0, this.width, this.height)
+  }
+
+  private drawGlowingParticle(particle: GlowingParticle) {
+    const ctx = this.ctx
+    
+    particle.pulsePhase += particle.pulseSpeed
+    const pulse = 0.8 + Math.sin(particle.pulsePhase) * 0.2
+    const currentAlpha = particle.alpha * pulse
+    const currentSize = particle.size * pulse
+
+    const colorMatch = particle.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+    if (!colorMatch) return
+    const [, r, g, b] = colorMatch.map(Number)
+
+    if (this.isDark) {
+      const glowRadius = currentSize * 8
+      const gradient = ctx.createRadialGradient(
+        particle.x, particle.y, 0,
+        particle.x, particle.y, glowRadius
+      )
+      gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.8})`)
+      gradient.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.3})`)
+      gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.1})`)
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+
+      ctx.beginPath()
+      ctx.arc(particle.x, particle.y, glowRadius, 0, Math.PI * 2)
+      ctx.fillStyle = gradient
+      ctx.fill()
+
+      ctx.beginPath()
+      ctx.arc(particle.x, particle.y, currentSize * 0.5, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha * 0.9})`
+      ctx.fill()
+    } else {
+      const glowRadius = currentSize * 5
+      const gradient = ctx.createRadialGradient(
+        particle.x, particle.y, 0,
+        particle.x, particle.y, glowRadius
+      )
+      gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.5})`)
+      gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.2})`)
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+
+      ctx.beginPath()
+      ctx.arc(particle.x, particle.y, glowRadius, 0, Math.PI * 2)
+      ctx.fillStyle = gradient
+      ctx.fill()
+
+      ctx.beginPath()
+      ctx.arc(particle.x, particle.y, currentSize * 0.4, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${currentAlpha * 0.8})`
+      ctx.fill()
+    }
+  }
+
+  private drawTinyDot(dot: TinyDot) {
+    const ctx = this.ctx
+    
+    ctx.beginPath()
+    ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2)
+    
+    if (this.isDark) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${dot.alpha})`
+    } else {
+      ctx.fillStyle = `rgba(0, 0, 0, ${dot.alpha})`
+    }
+    ctx.fill()
+  }
+
+  private drawConnections() {
+    const connectionDistance = 120
+    
+    for (let i = 0; i < this.glowingParticles.length; i++) {
+      for (let j = i + 1; j < this.glowingParticles.length; j++) {
+        const dx = this.glowingParticles[i].x - this.glowingParticles[j].x
+        const dy = this.glowingParticles[i].y - this.glowingParticles[j].y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        if (distance < connectionDistance) {
+          const alpha = (1 - distance / connectionDistance) * 0.08
+          
+          this.ctx.beginPath()
+          this.ctx.moveTo(this.glowingParticles[i].x, this.glowingParticles[i].y)
+          this.ctx.lineTo(this.glowingParticles[j].x, this.glowingParticles[j].y)
+          this.ctx.strokeStyle = this.isDark 
+            ? `rgba(255, 255, 255, ${alpha})` 
+            : `rgba(107, 140, 255, ${alpha * 0.4})`
+          this.ctx.lineWidth = 0.5
+          this.ctx.stroke()
+        }
+      }
+    }
+  }
+
+  private updateGlowingParticle(particle: GlowingParticle) {
+    particle.driftPhaseX += particle.driftSpeedX
+    particle.driftPhaseY += particle.driftSpeedY
+    
+    const driftX = Math.sin(particle.driftPhaseX) * 0.3
+    const driftY = Math.cos(particle.driftPhaseY) * 0.3
+    
+    // Mouse interaction
+    const dx = this.mouseX - particle.x
+    const dy = this.mouseY - particle.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    const mouseRadius = this.isDark ? 200 : 180
+    const magnetRadius = 250 // Radius for magnetic attraction
+
+    // Determine if we should attract or repel
+    const shouldAttract = this.mouseStationaryTime > this.STATIONARY_THRESHOLD && !this.isMouseDown
+    
+    if (distance < mouseRadius && distance > 0) {
+      const force = (mouseRadius - distance) / mouseRadius
+      const angle = Math.atan2(dy, dx)
+      
+      if (this.isMouseDown) {
+        // Click = strong repulsion with anti-gravity
+        particle.vx -= Math.cos(angle) * force * 2.5
+        particle.vy -= Math.sin(angle) * force * 2.5
+        particle.vy -= force * 2
+      } else if (shouldAttract && distance < magnetRadius) {
+        // Stationary mouse = magnetic attraction
+        const attractionStrength = Math.min(this.mouseStationaryTime, 2) * 0.8
+        particle.vx += Math.cos(angle) * force * attractionStrength
+        particle.vy += Math.sin(angle) * force * attractionStrength
+      } else {
+        // Moving mouse = repulsion
+        particle.vx -= Math.cos(angle) * force * 0.8
+        particle.vy -= Math.sin(angle) * force * 0.8
+      }
+      
+      particle.alpha = Math.min(1, particle.baseAlpha + force * 0.5)
+    } else if (shouldAttract && distance < magnetRadius && distance > mouseRadius * 0.3) {
+      // Attraction from further away when stationary
+      const attractionForce = (1 - distance / magnetRadius) * Math.min(this.mouseStationaryTime, 2) * 0.3
+      const angle = Math.atan2(dy, dx)
+      particle.vx += Math.cos(angle) * attractionForce
+      particle.vy += Math.sin(angle) * attractionForce
+      particle.alpha = Math.min(1, particle.baseAlpha + attractionForce * 0.3)
+    } else {
+      particle.alpha += (particle.baseAlpha - particle.alpha) * 0.05
+    }
+
+    particle.vx += driftX * 0.01
+    particle.vy += driftY * 0.01
+    particle.vx *= 0.98
+    particle.vy *= 0.98
+
+    particle.x += particle.vx
+    particle.y += particle.vy
+
+    if (particle.x < -20) particle.x = this.width + 20
+    if (particle.x > this.width + 20) particle.x = -20
+    if (particle.y < -20) particle.y = this.height + 20
+    if (particle.y > this.height + 20) particle.y = -20
+  }
+
+  private updateTinyDot(dot: TinyDot) {
+    dot.driftPhaseX += 0.002
+    dot.driftPhaseY += 0.002
+    
+    const driftX = Math.sin(dot.driftPhaseX) * 0.1
+    const driftY = Math.cos(dot.driftPhaseY) * 0.1
+    
+    const dx = this.mouseX - dot.x
+    const dy = this.mouseY - dot.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    const mouseRadius = 120
+    const magnetRadius = 200
+
+    const shouldAttract = this.mouseStationaryTime > this.STATIONARY_THRESHOLD && !this.isMouseDown
+
+    if (distance < mouseRadius && distance > 0) {
+      const force = (mouseRadius - distance) / mouseRadius
+      const angle = Math.atan2(dy, dx)
+      
+      if (this.isMouseDown) {
+        dot.vx -= Math.cos(angle) * force * 2
+        dot.vy -= Math.sin(angle) * force * 2
+      } else if (shouldAttract) {
+        const attractionStrength = Math.min(this.mouseStationaryTime, 2) * 0.5
+        dot.vx += Math.cos(angle) * force * attractionStrength
+        dot.vy += Math.sin(angle) * force * attractionStrength
+      } else {
+        dot.vx -= Math.cos(angle) * force * 0.5
+        dot.vy -= Math.sin(angle) * force * 0.5
+      }
+    } else if (shouldAttract && distance < magnetRadius && distance > 5) {
+      const attractionForce = (1 - distance / magnetRadius) * Math.min(this.mouseStationaryTime, 2) * 0.2
+      const angle = Math.atan2(dy, dx)
+      dot.vx += Math.cos(angle) * attractionForce
+      dot.vy += Math.sin(angle) * attractionForce
+    }
+
+    dot.vx += driftX * 0.005
+    dot.vy += driftY * 0.005
+    dot.vx *= 0.95
+    dot.vy *= 0.95
+
+    dot.x += dot.vx
+    dot.y += dot.vy
+
+    if (dot.x < -10) dot.x = this.width + 10
+    if (dot.x > this.width + 10) dot.x = -10
+    if (dot.y < -10) dot.y = this.height + 10
+    if (dot.y > this.height + 10) dot.y = -10
+  }
+
+  private drawMouseGlow() {
+    if (this.mouseX < 0 || this.mouseY < 0) return
+
+    const shouldAttract = this.mouseStationaryTime > this.STATIONARY_THRESHOLD && !this.isMouseDown
+    const baseRadius = this.isMouseDown ? 100 : 60
+    const radius = shouldAttract ? baseRadius * 1.5 : baseRadius
+    
+    const gradient = this.ctx.createRadialGradient(
+      this.mouseX, this.mouseY, 0,
+      this.mouseX, this.mouseY, radius
     )
-    orb3.addColorStop(0, 'rgba(52, 168, 83, 0.06)')
-    orb3.addColorStop(0.5, 'rgba(52, 168, 83, 0.03)')
-    orb3.addColorStop(1, 'rgba(52, 168, 83, 0)')
-    ctx.fillStyle = orb3
-    ctx.fillRect(0, 0, width, height)
+
+    if (this.isDark) {
+      if (shouldAttract) {
+        // Magnetic attraction glow
+        gradient.addColorStop(0, 'rgba(105, 240, 174, 0.12)')
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      } else if (this.isMouseDown) {
+        gradient.addColorStop(0, 'rgba(255, 64, 129, 0.1)')
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      } else {
+        gradient.addColorStop(0, 'rgba(0, 229, 255, 0.06)')
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      }
+    } else {
+      if (shouldAttract) {
+        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.1)')
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+      } else if (this.isMouseDown) {
+        gradient.addColorStop(0, 'rgba(236, 72, 153, 0.08)')
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+      } else {
+        gradient.addColorStop(0, 'rgba(107, 140, 255, 0.04)')
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+      }
+    }
+
+    this.ctx.beginPath()
+    this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2)
+    this.ctx.fillStyle = gradient
+    this.ctx.fill()
+  }
+
+  update() {
+    this.time += 0.016
+    
+    // Track stationary time
+    if (this.mouseX > 0 && this.mouseY > 0) {
+      this.mouseStationaryTime += 0.016
+    } else {
+      this.mouseStationaryTime = 0
+    }
+    
+    this.drawBackground()
+    this.drawConnections()
+    this.drawMouseGlow()
+    
+    this.tinyDots.forEach(dot => {
+      this.updateTinyDot(dot)
+      this.drawTinyDot(dot)
+    })
+    
+    this.glowingParticles.forEach(particle => {
+      this.updateGlowingParticle(particle)
+      this.drawGlowingParticle(particle)
+    })
+
+    this.animationId = requestAnimationFrame(() => this.update())
+  }
+
+  handleResize() {
+    this.resize()
+    this.init()
+  }
+
+  destroy() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId)
+    }
+  }
+
+  start() {
+    this.update()
   }
 }
 
@@ -268,171 +641,111 @@ interface AntigravityCanvasProps {
   returnSpeed?: number
   minSize?: number
   maxSize?: number
+  className?: string
 }
 
-export function AntigravityCanvas({
-  particleCount = 100,
+export function AntigravityCanvas({ 
+  particleCount = 60,
   mouseRadius = 150,
   friction = 0.92,
   returnSpeed = 0.02,
   minSize = 2,
-  maxSize = 6,
+  maxSize = 5,
+  className 
 }: AntigravityCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const particlesRef = useRef<Particle[]>([])
-  const mouseRef = useRef({ x: -1000, y: -1000 })
-  const animationRef = useRef<number | null>(null)
-  const contextRef = useRef<CanvasRenderingContext2D | null>(null)
-  const { theme } = useTheme()
+  const systemRef = useRef<CombinedParticleSystem | null>(null)
+  const { theme, systemTheme } = useTheme()
+  
+  // Determine if dark mode is active
+  const isDark = theme === 'dark'
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    
-    contextRef.current = ctx
-    const isDark = theme === 'dark'
 
-    // Initialize particles
-    const initParticles = (width: number, height: number) => {
-      const particles: Particle[] = []
-      const colors = isDark ? COLORS_DARK : COLORS_LIGHT
-      
-      for (let i = 0; i < particleCount; i++) {
-        const x = Math.random() * width
-        const y = Math.random() * height
-        const size = isDark 
-          ? Math.random() * (maxSize - minSize) * 0.8 + minSize * 0.5
-          : Math.random() * (maxSize - minSize) + minSize
-        const color = colors[Math.floor(Math.random() * colors.length)]
-        
-        particles.push(new Particle(x, y, size, color, isDark))
-      }
-      
-      return particles
-    }
-    
-    // Animation loop
-    const animate = () => {
-      const currentCtx = contextRef.current
-      const currentCanvas = canvasRef.current
-      const currentTheme = theme
-      
-      if (!currentCtx || !currentCanvas) return
-      
-      const isDarkNow = currentTheme === 'dark'
-      
-      // Clear canvas
-      currentCtx.clearRect(0, 0, currentCanvas.width, currentCanvas.height)
-      
-      // Draw background
-      if (isDarkNow) {
-        // Dark space background
-        const bgGradient = currentCtx.createLinearGradient(0, 0, currentCanvas.width, currentCanvas.height)
-        bgGradient.addColorStop(0, '#0a0a0f')
-        bgGradient.addColorStop(0.5, '#0f0f1a')
-        bgGradient.addColorStop(1, '#0a0a0f')
-        currentCtx.fillStyle = bgGradient
-        currentCtx.fillRect(0, 0, currentCanvas.width, currentCanvas.height)
-        
-        // Add subtle stars in background
-        for (let i = 0; i < 50; i++) {
-          const x = Math.random() * currentCanvas.width
-          const y = Math.random() * currentCanvas.height
-          const size = Math.random() * 0.5 + 0.1
-          currentCtx.beginPath()
-          currentCtx.arc(x, y, size, 0, Math.PI * 2)
-          currentCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3 + 0.1})`
-          currentCtx.fill()
-        }
-      } else {
-        // Light background
-        const bgGradient = currentCtx.createLinearGradient(0, 0, currentCanvas.width, currentCanvas.height)
-        bgGradient.addColorStop(0, '#ffffff')
-        bgGradient.addColorStop(0.5, '#f8fafc')
-        bgGradient.addColorStop(1, '#f1f5f9')
-        currentCtx.fillStyle = bgGradient
-        currentCtx.fillRect(0, 0, currentCanvas.width, currentCanvas.height)
-      }
-      
-      // Draw decorative elements
-      drawGradientOrbs(currentCtx, currentCanvas.width, currentCanvas.height, isDarkNow)
-      
-      // Update and draw particles
-      const { x: mouseX, y: mouseY } = mouseRef.current
-      
-      particlesRef.current.forEach(particle => {
-        particle.update(
-          mouseX, 
-          mouseY, 
-          mouseRadius * (isDarkNow ? 1.5 : 1), 
-          friction, 
-          returnSpeed,
-          isDarkNow,
-          currentCanvas.width,
-          currentCanvas.height
-        )
-        particle.draw(currentCtx, isDarkNow)
-      })
-      
-      // Continue animation
-      animationRef.current = requestAnimationFrame(animate)
-    }
-    
-    // Set canvas size and initialize
+    const system = new CombinedParticleSystem(canvas, isDark)
+    systemRef.current = system
+    system.start()
+
     const handleResize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-      
-      // Reinitialize particles on resize
-      particlesRef.current = initParticles(canvas.width, canvas.height)
+      system.handleResize()
     }
-    
-    handleResize()
+
     window.addEventListener('resize', handleResize)
-    
-    // Start animation
-    animate()
-    
-    // Cleanup
+
     return () => {
       window.removeEventListener('resize', handleResize)
-      if (animationRef.current !== null) {
-        cancelAnimationFrame(animationRef.current)
-      }
+      system.destroy()
     }
-  }, [particleCount, mouseRadius, friction, returnSpeed, minSize, maxSize, theme])
+  }, [])
 
-  // Mouse move handler
+  useEffect(() => {
+    if (systemRef.current) {
+      systemRef.current.setTheme(isDark)
+    }
+  }, [isDark])
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      mouseRef.current = { x: e.clientX, y: e.clientY }
-    }
-    
-    const handleMouseLeave = () => {
-      mouseRef.current = { x: -1000, y: -1000 }
-    }
-    
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        mouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      if (systemRef.current) {
+        systemRef.current.setMouse(e.clientX, e.clientY)
       }
     }
-    
-    const handleTouchEnd = () => {
-      mouseRef.current = { x: -1000, y: -1000 }
+
+    const handleMouseDown = () => {
+      if (systemRef.current) {
+        systemRef.current.setMouseDown(true)
+      }
     }
-    
+
+    const handleMouseUp = () => {
+      if (systemRef.current) {
+        systemRef.current.setMouseDown(false)
+      }
+    }
+
+    const handleMouseLeave = () => {
+      if (systemRef.current) {
+        systemRef.current.setMouse(-1000, -1000)
+        systemRef.current.setMouseDown(false)
+      }
+    }
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 0 && systemRef.current) {
+        systemRef.current.setMouse(e.touches[0].clientX, e.touches[0].clientY)
+        systemRef.current.setMouseDown(true)
+      }
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0 && systemRef.current) {
+        systemRef.current.setMouse(e.touches[0].clientX, e.touches[0].clientY)
+      }
+    }
+
+    const handleTouchEnd = () => {
+      if (systemRef.current) {
+        systemRef.current.setMouse(-1000, -1000)
+        systemRef.current.setMouseDown(false)
+      }
+    }
+
     window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mouseup', handleMouseUp)
     window.addEventListener('mouseleave', handleMouseLeave)
-    window.addEventListener('touchmove', handleTouchMove)
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
     window.addEventListener('touchend', handleTouchEnd)
-    
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('mouseleave', handleMouseLeave)
+      window.removeEventListener('touchstart', handleTouchStart)
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', handleTouchEnd)
     }
@@ -441,15 +754,12 @@ export function AntigravityCanvas({
   return (
     <canvas
       ref={canvasRef}
-      id="antigravity-canvas"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
+      className={`fixed inset-0 -z-10 ${className || ''}`}
+      style={{ 
+        width: '100%', 
         height: '100%',
-        zIndex: -1,
-        pointerEvents: 'none',
+        pointerEvents: 'auto',
+        cursor: 'pointer'
       }}
     />
   )
@@ -459,18 +769,15 @@ export function AntigravityCanvas({
 export function AntigravityStyles() {
   return (
     <style jsx global>{`
-      /* Dark mode class */
       .dark {
         color-scheme: dark;
       }
 
-      /* Content wrapper - ensures content is above canvas */
       .content-wrapper {
         position: relative;
         z-index: 10;
       }
 
-      /* Glass card effect - Light */
       .glass-card {
         background: rgba(255, 255, 255, 0.75);
         backdrop-filter: blur(16px);
@@ -484,7 +791,6 @@ export function AntigravityStyles() {
         transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
       }
 
-      /* Glass card effect - Dark */
       .dark .glass-card {
         background: rgba(20, 20, 30, 0.8);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -495,393 +801,16 @@ export function AntigravityStyles() {
           inset 0 1px 0 rgba(255, 255, 255, 0.05);
       }
 
-      /* Glass nav effect - Light */
       .glass-nav {
         background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.6);
-        transition: background 0.3s ease, border-color 0.3s ease;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       }
 
-      /* Glass nav effect - Dark */
       .dark .glass-nav {
-        background: rgba(10, 10, 20, 0.85);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      }
-
-      /* Custom animations */
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(40px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      @keyframes fadeInScale {
-        from {
-          opacity: 0;
-          transform: scale(0.9);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
-
-      @keyframes slideInLeft {
-        from {
-          opacity: 0;
-          transform: translateX(-40px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes slideInRight {
-        from {
-          opacity: 0;
-          transform: translateX(40px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes pulseGlow {
-        0%, 100% {
-          box-shadow: 0 0 30px rgba(66, 133, 244, 0.3);
-        }
-        50% {
-          box-shadow: 0 0 50px rgba(66, 133, 244, 0.5);
-        }
-      }
-
-      @keyframes floatElement {
-        0%, 100% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(-10px);
-        }
-      }
-
-      @keyframes shimmer {
-        0% {
-          background-position: -200% center;
-        }
-        100% {
-          background-position: 200% center;
-        }
-      }
-
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .animate-fade-in-up {
-        animation: fadeInUp 0.8s ease-out forwards;
-      }
-
-      .animate-fade-in-scale {
-        animation: fadeInScale 0.6s ease-out forwards;
-      }
-
-      .animate-slide-in-left {
-        animation: slideInLeft 0.6s ease-out forwards;
-      }
-
-      .animate-slide-in-right {
-        animation: slideInRight 0.6s ease-out forwards;
-      }
-
-      .animate-pulse-glow {
-        animation: pulseGlow 3s ease-in-out infinite;
-      }
-
-      .animate-float {
-        animation: floatElement 4s ease-in-out infinite;
-      }
-
-      .animate-shimmer {
-        background-size: 200% auto;
-        animation: shimmer 3s linear infinite;
-      }
-
-      .animate-spin {
-        animation: spin 1s linear infinite;
-      }
-
-      /* Staggered animation delays */
-      .stagger-1 { animation-delay: 0.1s; }
-      .stagger-2 { animation-delay: 0.2s; }
-      .stagger-3 { animation-delay: 0.3s; }
-      .stagger-4 { animation-delay: 0.4s; }
-      .stagger-5 { animation-delay: 0.5s; }
-      .stagger-6 { animation-delay: 0.6s; }
-      .stagger-7 { animation-delay: 0.7s; }
-      .stagger-8 { animation-delay: 0.8s; }
-
-      /* Hover effects */
-      .hover-lift {
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-                    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-
-      .hover-lift:hover {
-        transform: translateY(-6px);
-        box-shadow: 
-          0 20px 40px -10px rgba(0, 0, 0, 0.12),
-          0 8px 16px -4px rgba(0, 0, 0, 0.06);
-      }
-
-      .dark .hover-lift:hover {
-        box-shadow: 
-          0 20px 40px -10px rgba(0, 0, 0, 0.4),
-          0 8px 16px -4px rgba(0, 0, 0, 0.2);
-      }
-
-      .hover-scale {
-        transition: transform 0.3s ease;
-      }
-
-      .hover-scale:hover {
-        transform: scale(1.02);
-      }
-
-      /* Gradient text - Light */
-      .gradient-text {
-        background: linear-gradient(135deg, #4285f4 0%, #9b59b6 50%, #ea4335 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-
-      /* Gradient text - Dark */
-      .dark .gradient-text {
-        background: linear-gradient(135deg, #6db3f8 0%, #c39bd3 50%, #f1948a 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-
-      .gradient-text-alt {
-        background: linear-gradient(135deg, #34a853 0%, #4285f4 50%, #9b59b6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-
-      /* Text gradient animation - Light */
-      .text-gradient-animate {
-        background: linear-gradient(
-          90deg,
-          #4285f4 0%,
-          #9b59b6 25%,
-          #ea4335 50%,
-          #34a853 75%,
-          #4285f4 100%
-        );
-        background-size: 200% auto;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        animation: shimmer 4s linear infinite;
-      }
-
-      /* Text gradient animation - Dark */
-      .dark .text-gradient-animate {
-        background: linear-gradient(
-          90deg,
-          #6db3f8 0%,
-          #c39bd3 25%,
-          #f1948a 50%,
-          #81c784 75%,
-          #6db3f8 100%
-        );
-        background-size: 200% auto;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        animation: shimmer 4s linear infinite;
-      }
-
-      /* Button gradient - Light */
-      .btn-gradient {
-        background: linear-gradient(135deg, #4285f4 0%, #9b59b6 100%);
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-      }
-
-      .btn-gradient::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(135deg, #5a9bf4 0%, #ab6bc6 100%);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      }
-
-      .btn-gradient:hover::before {
-        opacity: 1;
-      }
-
-      .btn-gradient span {
-        position: relative;
-        z-index: 1;
-      }
-
-      /* Button gradient - Dark */
-      .dark .btn-gradient {
-        background: linear-gradient(135deg, #5a9bf4 0%, #ab6bc6 100%);
-      }
-
-      .dark .btn-gradient::before {
-        background: linear-gradient(135deg, #6db3f8 0%, #c39bd3 100%);
-      }
-
-      /* Card hover glow */
-      .card-glow {
-        position: relative;
-        overflow: hidden;
-      }
-
-      .card-glow::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          135deg,
-          transparent 0%,
-          rgba(66, 133, 244, 0.05) 50%,
-          transparent 100%
-        );
-        opacity: 0;
-        transition: opacity 0.3s ease;
-      }
-
-      .card-glow:hover::before {
-        opacity: 1;
-      }
-
-      .dark .card-glow::before {
-        background: linear-gradient(
-          135deg,
-          transparent 0%,
-          rgba(100, 149, 237, 0.1) 50%,
-          transparent 100%
-        );
-      }
-
-      /* Status indicator */
-      .status-online {
-        position: relative;
-      }
-
-      .status-online::after {
-        content: '';
-        position: absolute;
-        bottom: 2px;
-        right: 2px;
-        width: 14px;
-        height: 14px;
-        background: #34a853;
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 0 10px rgba(52, 168, 83, 0.5);
-      }
-
-      .dark .status-online::after {
-        border-color: #1a1a2e;
-      }
-
-      /* Custom scrollbar - Light */
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-      }
-
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.03);
-        border-radius: 3px;
-      }
-
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #4285f4, #9b59b6);
-        border-radius: 3px;
-      }
-
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, #3275e4, #8b49a6);
-      }
-
-      /* Custom scrollbar - Dark */
-      .dark .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-      }
-
-      .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #5a9bf4, #ab6bc6);
-      }
-
-      /* Theme toggle button */
-      .theme-toggle {
-        position: relative;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .dark .theme-toggle {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-
-      .theme-toggle:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      }
-
-      .dark .theme-toggle:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      }
-
-      /* Reduced motion support */
-      @media (prefers-reduced-motion: reduce) {
-        .animate-fade-in-up,
-        .animate-fade-in-scale,
-        .animate-slide-in-left,
-        .animate-slide-in-right,
-        .animate-pulse-glow,
-        .animate-float,
-        .animate-shimmer,
-        .text-gradient-animate,
-        .animate-spin {
-          animation: none !important;
-        }
-        
-        .hover-lift:hover {
-          transform: none;
-        }
+        background: rgba(8, 11, 20, 0.85);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
     `}</style>
   )

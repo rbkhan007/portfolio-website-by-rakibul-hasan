@@ -8,13 +8,23 @@ async function main() {
   // Create Profile
   const profile = await prisma.profile.upsert({
     where: { id: 'default' },
-    update: {},
-    create: {
-      id: 'default',
-      name: 'MD Jahid Uddin Sami',
+    update: {
+      name: 'MD Rakibul Hasan',
       title: 'Full Stack Developer',
       bio: 'Full Stack Developer specializing in building exceptional web applications with modern technologies. Passionate about creating beautiful, functional, and user-friendly websites.',
-      email: 'jahid@example.com',
+      email: 'rakibul@example.com',
+      location: 'Bangladesh',
+      avatar: '/profile.png',
+      github: 'https://github.com',
+      linkedin: 'https://linkedin.com',
+      available: true,
+    },
+    create: {
+      id: 'default',
+      name: 'MD Rakibul Hasan',
+      title: 'Full Stack Developer',
+      bio: 'Full Stack Developer specializing in building exceptional web applications with modern technologies. Passionate about creating beautiful, functional, and user-friendly websites.',
+      email: 'rakibul@example.com',
       location: 'Bangladesh',
       avatar: '/profile.png',
       github: 'https://github.com',

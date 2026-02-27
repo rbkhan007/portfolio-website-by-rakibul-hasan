@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
+import { useTheme } from '@/components/theme-provider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { 
   User, 
   Code2, 
@@ -22,7 +25,13 @@ import {
   LogOut,
   ExternalLink,
   Trash2,
-  Plus
+  Plus,
+  Globe,
+  Moon,
+  Sun,
+  Send,
+  Reply,
+  Check
 } from 'lucide-react'
 
 // Types
@@ -77,6 +86,7 @@ interface Contact {
   email: string
   subject: string | null
   message: string
+  reply: string | null
   read: boolean
   createdAt: Date
 }
@@ -84,6 +94,7 @@ interface Contact {
 export default function AdminPage() {
   const router = useRouter()
   const { isAuthenticated, checkAuth, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   
   // All state hooks must be declared at the top level - BEFORE any conditional returns
   const [loading, setLoading] = useState(true)
@@ -108,7 +119,7 @@ export default function AdminPage() {
   // Skills State
   const [skills, setSkills] = useState<Skill[]>([])
   const [showSkillForm, setShowSkillForm] = useState(false)
-  const [skillForm, setSkillForm] = useState({ name: '', category: 'Frontend' })
+  const [skillForm, setSkillForm] = useState({ name: '', category: 'Frontend', icon: '' })
 
   // Projects State
   const [projects, setProjects] = useState<Project[]>([])
@@ -138,6 +149,47 @@ export default function AdminPage() {
 
   // Contacts State
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
+
+  // Mark contact as read
+  const markAsRead = async (id: string) => {
+    await fetch('/api/contact', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, read: true })
+    })
+    loadContacts()
+  }
+
+  // Send reply to contact
+  const sendReply = async (contactId: string, email: string) => {
+    if (!replyText.trim()) return
+    
+    setSendingReply(true)
+    try {
+      await fetch('/api/contact', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: contactId, reply: replyText })
+      })
+      setReplyText('')
+      setReplyingTo(null)
+      loadContacts()
+      showMessage('Reply sent successfully!')
+    } catch (error) {
+      showMessage('Failed to send reply')
+    }
+    setSendingReply(false)
+  }
+
+  // Delete contact
+  const deleteContact = async (id: string) => {
+    await fetch(`/api/contact?id=${id}`, { method: 'DELETE' })
+    loadContacts()
+    showMessage('Message deleted')
+  }
 
   // Effects
   useEffect(() => {
@@ -224,7 +276,7 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(skillForm)
     })
-    setSkillForm({ name: '', category: 'Frontend' })
+    setSkillForm({ name: '', category: 'Frontend', icon: '' })
     setShowSkillForm(false)
     loadSkills()
   }
@@ -338,6 +390,20 @@ export default function AdminPage() {
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </Button>
+              {/* Theme Toggle */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={toggleTheme}
+                className="w-9 h-9"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleLogout} className="hidden sm:flex">
                 <LogOut className="h-4 w-4 mr-1" /> Logout
               </Button>
@@ -421,6 +487,65 @@ export default function AdminPage() {
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="mt-6">
+            {/* Profile Preview Card - Matches Homepage Design */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Profile Preview</h3>
+              <div className="flex justify-center">
+                <div className="relative w-64 sm:w-72">
+                  {/* Background Effects */}
+                  <div className="absolute -top-2 -left-2 w-32 h-32 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-2xl rotate-6" />
+                  <div className="absolute -bottom-2 -right-2 w-32 h-32 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl -rotate-6" />
+                  
+                  {/* Main Card */}
+                  <div className="relative bg-card border border-border rounded-2xl p-5 shadow-xl">
+                    <div className="flex flex-col items-center text-center">
+                      <Avatar className="w-24 h-24 border-4 border-primary/20 mb-4">
+                        <AvatarImage 
+                          src={profileForm.avatar && profileForm.avatar.trim() !== '' ? profileForm.avatar : '/profile.png'} 
+                          alt={profileForm.name || 'Profile'} 
+                          className="object-cover" 
+                        />
+                        <AvatarFallback className="text-2xl bg-primary/10">
+                          {profileForm.name?.split(' ').map(n => n[0]).join('') || 'RB'}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <h2 className="text-xl font-bold mb-1">{profileForm.name || 'Your Name'}</h2>
+                      <p className="text-muted-foreground text-xs mb-3">{profileForm.title || 'Your Title'}</p>
+                      
+                      {/* Available Status */}
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
+                        <span className={`w-1.5 h-1.5 rounded-full ${profileForm.available ? 'bg-emerald-500' : 'bg-gray-400'} animate-pulse`} />
+                        <span className="text-xs font-medium text-primary">
+                          {profileForm.available ? 'Available' : 'Unavailable'}
+                        </span>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 mt-3">
+                        <Button className="rounded-full px-4 text-xs h-7">
+                          Approve
+                        </Button>
+                        <Button variant="destructive" className="rounded-full px-3 text-xs h-7">
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating Badges */}
+                  <div className="absolute top-5 -right-2 bg-background border border-border rounded-lg p-1.5 shadow-lg animate-bounce" style={{ animationDuration: '3s' }}>
+                    <Code2 className="h-3 w-3 text-primary" />
+                  </div>
+                  <div className="absolute bottom-8 -left-2 bg-background border border-border rounded-lg p-1.5 shadow-lg animate-bounce" style={{ animationDuration: '4s' }}>
+                    <Globe className="h-3 w-3 text-purple-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Form */}
             <Card>
               <CardHeader>
                 <CardTitle>Profile Information</CardTitle>
@@ -468,11 +593,11 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Avatar Path</Label>
-                  <Input 
-                    value={profileForm.avatar} 
-                    onChange={(e) => setProfileForm({...profileForm, avatar: e.target.value})}
-                    placeholder="/profile.png"
+                  <Label>Avatar</Label>
+                  <ImageUpload 
+                    value={profileForm.avatar}
+                    onChange={(value) => setProfileForm({...profileForm, avatar: value})}
+                    label="Upload Avatar"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -518,7 +643,7 @@ export default function AdminPage() {
               <CardContent>
                 {showSkillForm && (
                   <div className="mb-4 p-4 bg-secondary/30 rounded-lg space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <Label>Skill Name</Label>
                         <Input 
@@ -541,6 +666,15 @@ export default function AdminPage() {
                         </select>
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Icon (SVG URL or uploaded image)</Label>
+                      <ImageUpload
+                        value={skillForm.icon}
+                        onChange={(value) => setSkillForm({...skillForm, icon: value})}
+                        label="Upload Skill Icon"
+                        accept="image/svg+xml,image/*"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={addSkill}>Add</Button>
                       <Button size="sm" variant="outline" onClick={() => setShowSkillForm(false)}>Cancel</Button>
@@ -550,9 +684,22 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   {skills.map((skill) => (
                     <div key={skill.id} className="flex items-center justify-between p-2 border rounded-lg">
-                      <div>
-                        <span className="font-medium">{skill.name}</span>
-                        <Badge variant="secondary" className="ml-2 text-xs">{skill.category}</Badge>
+                      <div className="flex items-center gap-3">
+                        {skill.icon ? (
+                          <img 
+                            src={skill.icon} 
+                            alt={skill.name} 
+                            className="w-8 h-8 object-contain"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-secondary rounded flex items-center justify-center">
+                            <Code2 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium">{skill.name}</span>
+                          <Badge variant="secondary" className="ml-2 text-xs">{skill.category}</Badge>
+                        </div>
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => deleteSkill(skill.id)}>
                         <Trash2 className="h-4 w-4 text-red-500" />
@@ -603,11 +750,11 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <Label>Image Path</Label>
-                        <Input 
+                        <Label>Project Image</Label>
+                        <ImageUpload 
                           value={projectForm.image}
-                          onChange={(e) => setProjectForm({...projectForm, image: e.target.value})}
-                          placeholder="/project.png"
+                          onChange={(value) => setProjectForm({...projectForm, image: value})}
+                          label="Upload Project Image"
                         />
                       </div>
                       <div>
@@ -714,11 +861,11 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <Label>Image Path</Label>
-                        <Input 
+                        <Label>Blog Image</Label>
+                        <ImageUpload 
                           value={blogForm.image}
-                          onChange={(e) => setBlogForm({...blogForm, image: e.target.value})}
-                          placeholder="/blog-1.png"
+                          onChange={(value) => setBlogForm({...blogForm, image: value})}
+                          label="Upload Blog Image"
                         />
                       </div>
                       <div>
@@ -773,14 +920,18 @@ export default function AdminPage() {
                 <CardTitle>Contact Messages</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {contacts.map((contact) => (
-                    <div key={contact.id} className={`p-3 border rounded-lg ${!contact.read ? 'border-primary bg-primary/5' : ''}`}>
+                    <div 
+                      key={contact.id} 
+                      className={`p-4 border rounded-lg ${!contact.read ? 'border-primary bg-primary/5' : 'border-border'}`}
+                    >
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{contact.name}</span>
                             {!contact.read && <Badge className="text-xs">New</Badge>}
+                            {contact.reply && <Badge variant="secondary" className="text-xs">Replied</Badge>}
                           </div>
                           <p className="text-sm text-muted-foreground">{contact.email}</p>
                         </div>
@@ -789,7 +940,78 @@ export default function AdminPage() {
                         </span>
                       </div>
                       {contact.subject && <p className="text-sm font-medium mt-2">{contact.subject}</p>}
-                      <p className="text-sm mt-1">{contact.message}</p>
+                      <p className="text-sm mt-2">{contact.message}</p>
+                      
+                      {/* Reply Section */}
+                      {contact.reply ? (
+                        <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                          <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs font-medium mb-1">
+                            <Reply className="h-3 w-3" /> Your Reply:
+                          </div>
+                          <p className="text-sm text-green-700 dark:text-green-300">{contact.reply}</p>
+                        </div>
+                      ) : replyingTo === contact.id ? (
+                        <div className="mt-3 space-y-2">
+                          <Textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Write your reply..."
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => sendReply(contact.id, contact.email)}
+                              disabled={sendingReply || !replyText.trim()}
+                            >
+                              {sendingReply ? (
+                                <>Sending...</>
+                              ) : (
+                                <><Send className="h-4 w-4 mr-1" /> Send Reply</>
+                              )}
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                setReplyingTo(null)
+                                setReplyText('')
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 mt-3">
+                        {!contact.read && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markAsRead(contact.id)}
+                          >
+                            <Check className="h-4 w-4 mr-1" /> Mark Read
+                          </Button>
+                        )}
+                        {!contact.reply && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => setReplyingTo(contact.id)}
+                          >
+                            <Reply className="h-4 w-4 mr-1" /> Reply
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteContact(contact.id)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {contacts.length === 0 && <p className="text-muted-foreground text-sm">No messages yet.</p>}

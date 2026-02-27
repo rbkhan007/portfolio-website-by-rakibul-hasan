@@ -1,30 +1,32 @@
-# Portfolio - MD Rakibul Hasan 👨‍💻 Developer
+# Portfolio - MD Rakibul Hasan 👨‍💻 Full Stack Developer
 
 A modern, responsive portfolio website built with Next.js, TypeScript, Tailwind CSS, and Shadcn UI.
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3-38bdf8)
 
 ## Features
 
 - 🎨 Modern, responsive design with dark/light mode
-- ✨ Beautiful particle background animation
+- ✨ Beautiful particle background animation with anti-gravity effects
 - 📱 Mobile-friendly navigation
 - 🌓 Theme toggle (dark/light)
 - 📝 Contact form with database storage
+- 💬 Admin can view and reply to contact messages
+- 🖼️ Image upload for profile, projects, blog posts, and skill icons
 - 🚀 SEO optimized
 - 🔐 Admin panel with authentication
 - 💾 SQLite database for content management
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: Shadcn UI
 - **Database**: SQLite with Prisma ORM
-- **Animation**: Custom canvas particle system
+- **Animation**: Custom canvas particle system with glowing effects
 - **Authentication**: Cookie-based auth with bcrypt
 
 ## Getting Started
@@ -63,15 +65,22 @@ npm run dev
 ## Admin Panel
 
 Access the admin panel at `/admin` to manage:
-- Profile information
-- Skills
-- Projects
-- Blog posts
-- Contact messages
+- 👤 Profile information (with avatar upload)
+- 🛠️ Skills (with custom icon upload)
+- 📁 Projects (with image upload)
+- 📝 Blog posts (with image upload)
+- 💬 Contact messages (view, reply, mark as read, delete)
 
 **Default login credentials:**
 - Username: admin
 - Password: admin123
+
+### New Admin Features
+
+- **Image Upload**: Upload images for profile avatar, projects, blog posts, and skill icons
+- **Message Reply**: Reply to contact messages directly from the admin panel
+- **Mark as Read**: Track which messages you've seen
+- **Skill Icons**: Add custom SVG or image icons to skills
 
 ## Project Structure
 
@@ -81,6 +90,11 @@ src/
 │   ├── about/             # About page
 │   ├── api/               # API routes
 │   │   ├── admin/         # Admin CRUD APIs
+│   │   │   ├── blog/      # Blog management
+│   │   │   ├── profile/   # Profile management
+│   │   │   ├── projects/  # Projects management
+│   │   │   ├── skills/    # Skills management
+│   │   │   └── upload/    # Image upload
 │   │   ├── auth/          # Authentication API
 │   │   └── contact/       # Contact form API
 │   ├── blog/              # Blog page
@@ -91,11 +105,12 @@ src/
 │   ├── login/            # Login page
 │   ├── globals.css        # Global styles
 │   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Home page
+│   └── page.tsx           # Home page with neon sign
 ├── components/            # React components
 │   ├── antigravity-background.tsx  # Particle animation
 │   ├── navbar.tsx         # Navigation bar
 │   ├── theme-provider.tsx # Theme context
+│   ├── theme-toggle.tsx   # Theme switcher
 │   └── ui/               # Shadcn UI components
 ├── hooks/                 # Custom React hooks
 │   └── use-auth.tsx      # Authentication hook
@@ -103,7 +118,7 @@ src/
 │   ├── db.ts             # Prisma client
 │   └── utils.ts          # Common utilities
 └── public/               # Static assets
-    ├── images/           # Project images
+    ├── uploads/          # Uploaded images
     └── logo.svg         # Site logo
 ```
 
@@ -125,7 +140,11 @@ The contact form stores messages in a SQLite database. To view submitted message
 npx prisma studio
 ```
 
-Or use the Admin Panel at `/admin`.
+Or use the Admin Panel at `/admin` where you can:
+- View all contact messages
+- Mark messages as read
+- Reply to messages
+- Delete messages
 
 ## Deployment
 
@@ -148,9 +167,9 @@ MIT License - feel free to use this project for your own portfolio.
 
 ## Author
 
-**MD Rakibul Hasan** 👨‍💻 Developer
+**MD Rakibul Hasan** 👨‍💻 Full Stack Developer
 
-Built by MD. Rakibul Hasan for Basudebpur High School.
+Built by MD. Rakibul Hasan for Basudevpur High School.
 
 ☕ **Support My Work:**
 - Bkash: +880 1774-471120

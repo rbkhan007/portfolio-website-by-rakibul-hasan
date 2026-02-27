@@ -54,9 +54,9 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">JS</span>
+              <span className="text-white font-bold text-sm">RH</span>
             </div>
-            <span className="font-semibold text-sm hidden sm:block">MD Rakibul Hasan</span>
+            <span className="font-semibold text-sm hidden sm:block">RH</span>
           </Link>
 
           {/* Desktop Navigation - macOS style */}

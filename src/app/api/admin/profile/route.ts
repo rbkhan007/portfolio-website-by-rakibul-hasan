@@ -9,7 +9,7 @@ export async function GET() {
     if (!profile) {
       profile = await db.profile.create({
         data: {
-          name: 'MD Jahid Uddin Sami',
+          name: 'MD Rakibul Hasan',
           title: 'Full Stack Developer',
           bio: 'Full Stack Developer specializing in building exceptional web applications with modern technologies.',
           email: 'jahid@example.com',
@@ -54,7 +54,7 @@ export async function PUT(request: Request) {
     } else {
       profile = await db.profile.create({
         data: {
-          name: name || 'MD Jahid Uddin Sami',
+          name: name || 'MD Rakibul Hasan',
           title: title || 'Full Stack Developer',
           bio: bio || '',
           email: email || 'jahid@example.com',
